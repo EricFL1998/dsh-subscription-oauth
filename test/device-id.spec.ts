@@ -91,4 +91,19 @@ describe('identity headers', () => {
     }
     assert.doesNotThrow(() => new Headers(kimiIdentityHeaders('a'.repeat(32))))
   })
+
+  test('truncation never leaves a dangling percent escape', () => {
+    // '小' encodes to 9 chars; 30 of them encode to 270 chars, so the
+    // 200-char cut lands mid-escape ('…%E'). The trimmed value must end
+    // on a complete escape.
+    const long = byteStringSafe('小'.repeat(30))
+    assert.equal(long.length, 198)
+    assert.ok(long.endsWith('%8F'))
+    assert.doesNotMatch(long, /%[0-9A-F]?$/)
+    assert.doesNotThrow(() => new Headers({ 'X-Msh-Device-Name': long }))
+    // A value that already ends on a complete escape keeps it.
+    assert.equal(byteStringSafe('小'.repeat(22)).length, 198)
+    assert.ok(byteStringSafe('小'.repeat(22)).endsWith('%8F'))
+  })
+  })
 })
