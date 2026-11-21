@@ -61,6 +61,28 @@ export function osVersion(): string {
 }
 
 /**
+ * Keep a header value representable as a WHATWG ByteString (all code units
+ * <= 0xFF).
+ *
+ * `fetch` rejects a header whose value contains a code unit above 255 before
+ * the request is even sent ("Cannot convert argument to a ByteString ...").
+ * Windows machine names can legitimately contain CJK characters (for example
+ * `COMPUTERNAME="小星"`), and a localized `os.version()` can too. ASCII values
+ * pass through untouched; anything else is percent-encoded into a stable,
+ * single-line ASCII value. Device identity for usage correlation lives in
+ * `X-Msh-Device-Id`, not in these display fields.
+ * @param value - raw header value.
+ * @returns a ByteString-safe header value.
+ */
+export function byteStringSafe(value: string): string {
+  const text = String(value ?? '')
+  for (let i = 0; i < text.length; i += 1) {
+    if (text.charCodeAt(i) > 0xff) return encodeURIComponent(text).slice(0, 200)
+  }
+  return text
+}
+
+/**
  * Assemble the identity headers every Kimi Code request carries.
  * @param deviceId - this machine's persisted 32-hex device id.
  * @returns the `X-Msh-*` / `User-Agent` header record.
@@ -70,9 +92,9 @@ export function kimiIdentityHeaders(deviceId: string): Record<string, string> {
     'User-Agent': `KimiCLI/${KIMI_CLI_VERSION}`,
     'X-Msh-Platform': 'kimi_code_cli',
     'X-Msh-Version': KIMI_CLI_VERSION,
-    'X-Msh-Device-Name': os.hostname(),
-    'X-Msh-Device-Model': deviceModel(),
-    'X-Msh-Os-Version': osVersion(),
+    'X-Msh-Device-Name': byteStringSafe(os.hostname()),
+    'X-Msh-Device-Model': byteStringSafe(deviceModel()),
+    'X-Msh-Os-Version': byteStringSafe(osVersion()),
     'X-Msh-Device-Id': deviceId,
   }
 }

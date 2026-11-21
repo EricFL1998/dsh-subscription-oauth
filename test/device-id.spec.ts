@@ -7,7 +7,7 @@ import path from 'node:path'
 import { after, before, describe, test } from 'node:test'
 
 import { loadOrCreateDeviceId, mintDeviceId, readDeviceId } from '../src/auth/device-id.js'
-import { deviceModel, kimiIdentityHeaders, kimiRequestHeaders, platformWord } from '../src/auth/headers.js'
+import { deviceModel, byteStringSafe, kimiIdentityHeaders, kimiRequestHeaders, platformWord } from '../src/auth/headers.js'
 import { KIMI_CLI_VERSION } from '../src/constants.js'
 
 let directory: string
@@ -79,5 +79,16 @@ describe('identity headers', () => {
     // The attribution header must not survive as a second, competing field.
     assert.equal(headers['user-agent'], undefined)
     assert.deepEqual(Object.keys(headers).filter((key) => key.toLowerCase() === 'user-agent'), ['User-Agent'])
+  })
+
+  test('keeps machine-derived headers within the ByteString range', () => {
+    // Regression: a CJK Windows hostname (COMPUTERNAME="小星") used to make
+    // `new Headers(...)` throw before the device-authorization request was sent.
+    assert.equal(byteStringSafe('plain-host'), 'plain-host')
+    assert.equal(byteStringSafe('小星'), '%E5%B0%8F%E6%98%9F')
+    for (const value of Object.values(kimiIdentityHeaders('a'.repeat(32)))) {
+      for (const char of value) assert.ok(char.codePointAt(0)! <= 0xff, `unsafe header value: ${value}`)
+    }
+    assert.doesNotThrow(() => new Headers(kimiIdentityHeaders('a'.repeat(32))))
   })
 })
