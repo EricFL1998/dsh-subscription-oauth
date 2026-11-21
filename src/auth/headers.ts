@@ -69,7 +69,7 @@ export function osVersion(): string {
  * Windows machine names can legitimately contain CJK characters (for example
  * `COMPUTERNAME="小星"`), and a localized `os.version()` can too. ASCII values
  * pass through untouched; anything else is percent-encoded into a stable,
- * single-line ASCII value. Device identity for usage correlation lives in
+ * single-line ASCII value, truncated to 200 characters. Truncation trims a trailing partial `%XX` escape (a lone `%` or `%` plus one hex digit) so the result is always valid percent-encoding. Device identity for usage correlation lives in
  * `X-Msh-Device-Id`, not in these display fields.
  * @param value - raw header value.
  * @returns a ByteString-safe header value.
@@ -77,7 +77,9 @@ export function osVersion(): string {
 export function byteStringSafe(value: string): string {
   const text = String(value ?? '')
   for (let i = 0; i < text.length; i += 1) {
-    if (text.charCodeAt(i) > 0xff) return encodeURIComponent(text).slice(0, 200)
+    if (text.charCodeAt(i) > 0xff) {
+      return encodeURIComponent(text).slice(0, 200).replace(/%[0-9A-F]?$/, '')
+    }
   }
   return text
 }
